@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>KnotenWerk</title>
+        <link rel="stylesheet" href="./styles.css" />
+    </head>
+    <body>
+        <div class="desktop">
+            <div class="app-window win-panel win-panel--raised">
+                <header class="win-titlebar app-titlebar">
+                    <div class="app-titlebar__left">
+                        <img src="../images/logo.png" alt="KnotenWerk logo" class="app-logo" />
+                        <span class="app-title">KnotenWerk</span>
+                    </div>
+                </header>
+
+                <div class="app-layout">
+                    <aside class="sidebar win-panel win-panel--inset">
+                        <div class="win-titlebar win-titlebar--small">Graphs</div>
+
+                        <div class="sidebar-actions sidebar-actions--top">
+                            <button id="new-graph-btn" class="win-button">New Graph</button>
+                            <button id="import-graph-btn" class="win-button">Import JSON</button>
+                        </div>
+
+                        <div class="graph-list-wrap win-panel win-panel--sunken">
+                            <ul id="graph-list" class="graph-list" aria-label="Saved graphs"></ul>
+                        </div>
+
+                        <div class="sidebar-actions sidebar-actions--bottom">
+                            <button id="rename-graph-btn" class="win-button">Rename</button>
+                            <button id="duplicate-graph-btn" class="win-button">Duplicate</button>
+                            <button id="delete-graph-btn" class="win-button">Delete</button>
+                            <button id="export-graph-btn" class="win-button">Export</button>
+                        </div>
+                    </aside>
+
+                    <main class="main-panel win-panel win-panel--inset">
+                        <div class="main-header">
+                            <div class="graph-title-wrap">
+                                <span class="label">Current:</span>
+                                <span id="current-graph-name" class="current-graph-name">No Graph Loaded</span>
+                            </div>
+
+                            <fieldset class="mode-toggle win-panel win-panel--sunken">
+                                <legend>Mode</legend>
+                                <label><input type="radio" name="mode" value="edit" checked /> Edit Mode</label>
+                                <label><input type="radio" name="mode" value="view" /> View Mode</label>
+                            </fieldset>
+                        </div>
+
+                        <div class="toolbar win-panel win-panel--sunken">
+                            <button id="add-node-btn" class="win-button">Add Node</button>
+                            <button id="add-choice-btn" class="win-button">Add Choice</button>
+                            <button id="edit-node-btn" class="win-button">Edit Node</button>
+                            <button id="node-color-btn" class="win-button">Node Color</button>
+                            <button id="edit-choice-btn" class="win-button">Edit Choice</button>
+                            <button id="delete-node-btn" class="win-button">Delete Node</button>
+                            <button id="delete-choice-btn" class="win-button">Delete Choice</button>
+                            <button id="clear-path-btn" class="win-button">Clear Path</button>
+                        </div>
+
+                        <div
+                            id="editor-surface"
+                            class="editor-surface win-panel win-panel--sunken"
+                            aria-label="Graph editor canvas"
+                        >
+                            <svg id="edge-layer" class="edge-layer" aria-hidden="true">
+                                <defs>
+                                    <marker
+                                        id="edge-start-default"
+                                        markerWidth="12"
+                                        markerHeight="12"
+                                        refX="6"
+                                        refY="6"
+                                        orient="auto"
+                                        markerUnits="userSpaceOnUse"
+                                    >
+                                        <circle
+                                            cx="6"
+                                            cy="6"
+                                            r="4.2"
+                                            fill="#d9d9d9"
+                                            stroke="#575757"
+                                            stroke-width="1.5"
+                                        ></circle>
+                                    </marker>
+                                    <marker
+                                        id="edge-start-path"
+                                        markerWidth="12"
+                                        markerHeight="12"
+                                        refX="6"
+                                        refY="6"
+                                        orient="auto"
+                                        markerUnits="userSpaceOnUse"
+                                    >
+                                        <circle
+                                            cx="6"
+                                            cy="6"
+                                            r="4.2"
+                                            fill="#dce8d8"
+                                            stroke="#7b9c74"
+                                            stroke-width="1.5"
+                                        ></circle>
+                                    </marker>
+                                    <marker
+                                        id="edge-start-active"
+                                        markerWidth="12"
+                                        markerHeight="12"
+                                        refX="6"
+                                        refY="6"
+                                        orient="auto"
+                                        markerUnits="userSpaceOnUse"
+                                    >
+                                        <circle
+                                            cx="6"
+                                            cy="6"
+                                            r="4.2"
+                                            fill="#d6e5ff"
+                                            stroke="#1458c2"
+                                            stroke-width="1.5"
+                                        ></circle>
+                                    </marker>
+                                    <marker
+                                        id="arrow-head-default"
+                                        markerWidth="12"
+                                        markerHeight="12"
+                                        refX="12"
+                                        refY="6"
+                                        orient="auto"
+                                        markerUnits="userSpaceOnUse"
+                                    >
+                                        <path d="M 0 0 L 12 6 L 0 12 z" fill="#575757"></path>
+                                    </marker>
+                                    <marker
+                                        id="arrow-head-path"
+                                        markerWidth="12"
+                                        markerHeight="12"
+                                        refX="12"
+                                        refY="6"
+                                        orient="auto"
+                                        markerUnits="userSpaceOnUse"
+                                    >
+                                        <path d="M 0 0 L 12 6 L 0 12 z" fill="#7b9c74"></path>
+                                    </marker>
+                                    <marker
+                                        id="arrow-head-active"
+                                        markerWidth="12"
+                                        markerHeight="12"
+                                        refX="12"
+                                        refY="6"
+                                        orient="auto"
+                                        markerUnits="userSpaceOnUse"
+                                    >
+                                        <path d="M 0 0 L 12 6 L 0 12 z" fill="#1458c2"></path>
+                                    </marker>
+                                </defs>
+                            </svg>
+
+                            <div id="edge-control-layer" class="edge-control-layer"></div>
+                            <div id="node-layer" class="node-layer"></div>
+                            <div
+                                id="zoom-control"
+                                class="zoom-control win-panel win-panel--raised"
+                                aria-label="Zoom control"
+                            >
+                                <label for="zoom-slider" class="zoom-control__label">Zoom</label>
+                                <input
+                                    id="zoom-slider"
+                                    class="zoom-slider"
+                                    type="range"
+                                    min="0"
+                                    max="8"
+                                    step="1"
+                                    value="4"
+                                />
+                                <span id="zoom-value" class="zoom-control__value">100%</span>
+                                <button id="zoom-reset-btn" class="win-button zoom-reset-btn" type="button">
+                                    100%
+                                </button>
+                            </div>
+
+                            <div id="empty-state" class="empty-state">
+                                Double-click empty space or click <strong>Add Node</strong> to create your first node.
+                            </div>
+                        </div>
+
+                        <div class="status-row win-panel win-panel--sunken">
+                            <span id="status-text">Initializing...</span>
+                        </div>
+                    </main>
+                </div>
+            </div>
+        </div>
+
+        <div
+            id="color-picker-overlay"
+            class="modal-overlay hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="color-picker-title"
+        >
+            <div class="modal-window color-picker-window win-panel win-panel--raised">
+                <div id="color-picker-title" class="win-titlebar win-titlebar--small">8-Bit Node Color</div>
+                <div class="color-picker-body">
+                    <div id="color-picker-current" class="color-picker-current">Selected: Default</div>
+                    <div id="color-picker-grid" class="color-picker-grid" aria-label="8-bit color palette"></div>
+                </div>
+                <div class="modal-actions">
+                    <button id="color-picker-default" class="win-button">Default</button>
+                    <button id="color-picker-cancel" class="win-button">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <div
+            id="modal-overlay"
+            class="modal-overlay hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-title"
+        >
+            <div class="modal-window win-panel win-panel--raised">
+                <div id="modal-title" class="win-titlebar win-titlebar--small">Dialog</div>
+                <div class="modal-body">
+                    <p id="modal-message"></p>
+                    <input id="modal-input" class="win-input" type="text" />
+                    <select id="modal-select" class="win-input hidden"></select>
+                </div>
+                <div class="modal-actions">
+                    <button id="modal-ok" class="win-button">OK</button>
+                    <button id="modal-cancel" class="win-button">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <script type="module" src="./app.js"></script>
+    </body>
+</html>
