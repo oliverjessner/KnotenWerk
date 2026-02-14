@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "build:adhoc-dmg": "bash -lc 'set -euo pipefail; npm run tauri build -- --bundles app; APP=\"src-tauri/target/release/bundle/macos/KnotenWerk.app\"; if [ ! -d \"$APP\" ]; then echo \"App not found at $APP\"; exit 1; fi; if [ -f \"scripts/bundle-macos-dylibs.mjs\" ]; then node scripts/bundle-macos-dylibs.mjs \"$APP\"; else echo \"Skipping dylib bundling (scripts/bundle-macos-dylibs.mjs not found)\"; fi; codesign --force --deep --sign - \"$APP\"; codesign --verify --deep --strict --verbose=2 \"$APP\"; mkdir -p src-tauri/target/release/bundle/dmg; VERSION=$(node -p \"const c=require(\\\"./src-tauri/tauri.conf.json\\\"); c.version || (c.package && c.package.version) || \\\"0.0.0\\\"\"); ARCH=$(uname -m); OUT=\"src-tauri/target/release/bundle/dmg/KnotenWerk_${VERSION}_${ARCH}_adhoc.dmg\"; hdiutil create -volname \"KnotenWerk\" -srcfolder \"$APP\" -ov -format UDZO \"$OUT\"; echo \"Created $OUT\";'"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
