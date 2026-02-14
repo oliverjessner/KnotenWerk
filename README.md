@@ -5,4 +5,4 @@
 No-distraction, your granddad's UI design for simple trees that help you
 design solutions.
 
-![](images/mockup/tree.png)
+![](images/tree.png)
