@@ -1,4 +1,4 @@
-# 🪢 KnotenWerk
+# KnotenWerk 🪢
 
 ![Logo with Text](images/logo_with_name.png)
 
