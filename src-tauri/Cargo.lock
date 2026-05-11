@@ -1563,10 +1563,10 @@ dependencies = [
 name = "knotenwerk"
 version = "0.1.0"
 dependencies = [
+ "serde",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
- "tauri-plugin-fs",
 ]
 
 [[package]]

@@ -11,9 +11,9 @@ rust-version = "1.77"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+serde = { version = "1", features = ["derive"] }
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
-tauri-plugin-fs = "2"
 
 [features]
 default = ["custom-protocol"]

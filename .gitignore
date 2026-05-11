@@ -1,5 +1,13 @@
 .DS_Store
+.env
+.env.*
+*.log
+*.sqlite
+*.db
 node_modules/
 dist/
+build/
+.next/
+coverage/
 src-tauri/target/
 src-tauri/gen/

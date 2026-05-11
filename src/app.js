@@ -9,17 +9,7 @@ Build:
 1) npm run tauri build
 */
 
-import { BaseDirectory, appDataDir } from '@tauri-apps/api/path';
-import {
-  exists,
-  mkdir,
-  readDir,
-  readTextFile,
-  remove,
-  stat,
-  writeTextFile
-} from '@tauri-apps/plugin-fs';
-import { confirm, open, save } from '@tauri-apps/plugin-dialog';
+import { invoke } from '@tauri-apps/api/core';
 
 const GRAPH_VERSION = 1;
 const GRAPHS_DIR = 'graphs';
@@ -489,7 +479,7 @@ function renderColorPickerGrid() {
     return;
   }
 
-  el.colorPickerGrid.innerHTML = '';
+  el.colorPickerGrid.replaceChildren();
 
   state.eightBitPalette.forEach((color, index) => {
     const swatch = document.createElement('button');
@@ -601,7 +591,7 @@ async function generateUniqueGraphId() {
 
   while (true) {
     const usedInMemory = state.graphSummaries.some((item) => item.id === nextId);
-    const usedOnDisk = await exists(graphPath(nextId), { baseDir: BaseDirectory.AppData });
+    const usedOnDisk = await invoke('graph_file_exists', { graphId: nextId });
     if (!usedInMemory && !usedOnDisk) {
       return nextId;
     }
@@ -1042,13 +1032,13 @@ function graphPath(graphId) {
   return `${GRAPHS_DIR}/${graphId}.json`;
 }
 
-async function ensureGraphsDirectory() {
-  const dirExists = await exists(GRAPHS_DIR, { baseDir: BaseDirectory.AppData });
-  if (!dirExists) {
-    await mkdir(GRAPHS_DIR, { baseDir: BaseDirectory.AppData, recursive: true });
-  }
+function graphIdFromPath(path) {
+  const fileName = String(path || '').split('/').pop() || '';
+  return fileName.endsWith('.json') ? fileName.slice(0, -5) : fileName;
+}
 
-  const base = await appDataDir();
+async function ensureGraphsDirectory() {
+  const base = await invoke('ensure_graphs_directory');
   setStatus(`Graph directory ready: ${base}${GRAPHS_DIR}`);
 }
 
@@ -1056,20 +1046,19 @@ async function refreshGraphList() {
   const warnings = [];
   const summaries = [];
 
-  const entries = await readDir(GRAPHS_DIR, { baseDir: BaseDirectory.AppData });
+  const entries = await invoke('list_graph_files');
 
   for (const entry of entries) {
-    if (!entry.isFile || !entry.name.endsWith('.json')) {
+    if (!entry.name.endsWith('.json')) {
       continue;
     }
 
-    const relativePath = `${GRAPHS_DIR}/${entry.name}`;
+    const relativePath = entry.path;
 
     try {
-      const json = await readTextFile(relativePath, { baseDir: BaseDirectory.AppData });
+      const json = await invoke('read_graph_file', { graphId: graphIdFromPath(relativePath) });
       const parsed = JSON.parse(json);
       const graph = normalizeGraph(parsed, entry.name);
-      const info = await stat(relativePath, { baseDir: BaseDirectory.AppData }).catch(() => null);
 
       summaries.push({
         id: graph.id,
@@ -1078,7 +1067,9 @@ async function refreshGraphList() {
         updatedAt: graph.updatedAt,
         lastModified:
           graph.updatedAt ||
-          (info?.mtime instanceof Date ? info.mtime.toISOString() : graph.createdAt || nowISO())
+          (Number.isFinite(entry.lastModifiedMs)
+            ? new Date(entry.lastModifiedMs).toISOString()
+            : graph.createdAt || nowISO())
       });
     } catch (error) {
       warnings.push(`${entry.name}: ${error instanceof Error ? error.message : String(error)}`);
@@ -1124,7 +1115,7 @@ async function loadGraphById(graphId) {
 
 async function loadGraphFromSummary(summary) {
   try {
-    const json = await readTextFile(summary.path, { baseDir: BaseDirectory.AppData });
+    const json = await invoke('read_graph_file', { graphId: graphIdFromPath(summary.path) });
     const parsed = JSON.parse(json);
     const graph = normalizeGraph(parsed, summary.path);
 
@@ -1150,9 +1141,7 @@ async function loadGraphFromSummary(summary) {
 
 async function persistGraph(graph) {
   graph.updatedAt = nowISO();
-  await writeTextFile(graphPath(graph.id), JSON.stringify(graph, null, 2), {
-    baseDir: BaseDirectory.AppData
-  });
+  await invoke('write_graph_file', { graphId: graph.id, contents: JSON.stringify(graph, null, 2) });
 }
 
 function scheduleAutosave() {
@@ -1184,7 +1173,7 @@ function scheduleAutosave() {
 }
 
 function renderGraphList() {
-  el.graphList.innerHTML = '';
+  el.graphList.replaceChildren();
 
   const currentId = state.currentGraph?.id || null;
 
@@ -1221,8 +1210,8 @@ function renderGraph() {
 
   if (!graph) {
     el.currentGraphName.textContent = 'No Graph Loaded';
-    el.nodeLayer.innerHTML = '';
-    el.edgeControlLayer.innerHTML = '';
+    el.nodeLayer.replaceChildren();
+    el.edgeControlLayer.replaceChildren();
     el.edgeLayer.querySelectorAll('.edge').forEach((node) => node.remove());
     el.emptyState.classList.remove('hidden');
     closeNodeColorPicker();
@@ -1336,7 +1325,7 @@ function renderNodes() {
     return;
   }
 
-  el.nodeLayer.innerHTML = '';
+  el.nodeLayer.replaceChildren();
   state.nodeElements.clear();
 
   const context = getPathContext();
@@ -1446,7 +1435,7 @@ function renderEdges() {
   const context = getPathContext();
   const showViewPath = state.mode === 'view';
 
-  el.edgeControlLayer.innerHTML = '';
+  el.edgeControlLayer.replaceChildren();
   el.edgeLayer.querySelectorAll('.edge').forEach((node) => node.remove());
 
   graph.edges.forEach((edge) => {
@@ -2398,9 +2387,10 @@ async function deleteSelectedNodeFlow() {
     return;
   }
 
-  const yes = await confirm(`Delete node "${node.text}" and all connected choices?`, {
+  const yes = await showConfirm({
+    message: ['Delete node "', node.text, '" and all connected choices?'].join(''),
     title: 'Delete Node',
-    kind: 'warning'
+    okText: 'Delete'
   });
 
   if (!yes) {
@@ -2447,9 +2437,10 @@ async function deleteSelectedChoiceFlow() {
   const button = findButtonForEdge(edge);
   const label = button?.text || 'this choice';
 
-  const yes = await confirm(`Delete choice "${label}"?`, {
+  const yes = await showConfirm({
+    message: ['Delete choice "', label, '"?'].join(''),
     title: 'Delete Choice',
-    kind: 'warning'
+    okText: 'Delete'
   });
 
   if (!yes) {
@@ -2717,9 +2708,10 @@ async function deleteCurrentGraphFlow() {
     return;
   }
 
-  const yes = await confirm(`Delete graph "${state.currentGraph.name}"?`, {
+  const yes = await showConfirm({
+    message: ['Delete graph "', state.currentGraph.name, '"?'].join(''),
     title: 'Delete Graph',
-    kind: 'warning'
+    okText: 'Delete'
   });
 
   if (!yes) {
@@ -2729,7 +2721,7 @@ async function deleteCurrentGraphFlow() {
   const graphId = state.currentGraph.id;
 
   try {
-    await remove(graphPath(graphId), { baseDir: BaseDirectory.AppData });
+    await invoke('delete_graph_file', { graphId });
   } catch (error) {
     console.warn('Delete main graph file failed:', error);
   }
@@ -2795,17 +2787,17 @@ async function exportCurrentGraph() {
 }
 
 async function exportGraphAsJson(graph) {
-  const targetPath = await save({
+  const exported = await invoke('export_text_file', {
     title: 'Export Graph JSON',
     defaultPath: `${sanitizeFileName(graph.name)}.json`,
-    filters: [{ name: 'JSON', extensions: ['json'] }]
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+    contents: JSON.stringify(graph, null, 2)
   });
 
-  if (!targetPath) {
+  if (!exported) {
     return;
   }
 
-  await writeTextFile(targetPath, JSON.stringify(graph, null, 2));
   setStatus('Graph exported as JSON.');
 }
 
@@ -2863,17 +2855,17 @@ function buildMarkdownTodo(graph) {
 
 async function exportGraphAsMarkdownTodo(graph) {
   const dateStamp = formatDateStamp();
-  const targetPath = await save({
+  const exported = await invoke('export_text_file', {
     title: 'Export Markdown Todo',
     defaultPath: `${sanitizeFileName(graph.name)}_${dateStamp}.md`,
-    filters: [{ name: 'Markdown', extensions: ['md'] }]
+    filters: [{ name: 'Markdown', extensions: ['md'] }],
+    contents: buildMarkdownTodo(graph)
   });
 
-  if (!targetPath) {
+  if (!exported) {
     return;
   }
 
-  await writeTextFile(targetPath, buildMarkdownTodo(graph));
   setStatus('Graph exported as Markdown Todo.');
 }
 
@@ -3163,40 +3155,37 @@ ${overlays.join('\n')}
 }
 
 async function exportGraphAsPicture(graph) {
-  const targetPath = await save({
+  const svg = buildGraphPictureSvg(graph);
+  const exported = await invoke('export_text_file', {
     title: 'Export Graph Picture',
     defaultPath: `${sanitizeFileName(graph.name)}.svg`,
-    filters: [{ name: 'Picture', extensions: ['svg'] }]
+    filters: [{ name: 'Picture', extensions: ['svg'] }],
+    contents: svg
   });
 
-  if (!targetPath) {
+  if (!exported) {
     return;
   }
 
-  const svg = buildGraphPictureSvg(graph);
-  await writeTextFile(targetPath, svg);
   setStatus('Graph exported as picture (SVG).');
 }
 
 async function importGraphFromJson() {
   try {
-    const selected = await open({
+    const json = await invoke('import_text_file', {
       title: 'Import Graph JSON',
-      multiple: false,
-      directory: false,
       filters: [{ name: 'JSON', extensions: ['json'] }]
     });
 
-    if (!selected || Array.isArray(selected)) {
+    if (json === null) {
       return;
     }
 
-    const json = await readTextFile(selected);
     const parsed = JSON.parse(json);
     const graph = normalizeGraph(parsed, 'imported file');
 
     const idTakenInMemory = state.graphSummaries.some((item) => item.id === graph.id);
-    const idTakenOnDisk = await exists(graphPath(graph.id), { baseDir: BaseDirectory.AppData });
+    const idTakenOnDisk = await invoke('graph_file_exists', { graphId: graph.id });
 
     if (idTakenInMemory || idTakenOnDisk) {
       graph.id = uid('g');
@@ -3229,7 +3218,7 @@ function showModal(options) {
   el.modalInput.classList.toggle('hidden', !withInput);
   el.modalInput.value = withInput ? options.defaultValue || '' : '';
   el.modalSelect.classList.toggle('hidden', !withSelect);
-  el.modalSelect.innerHTML = '';
+  el.modalSelect.replaceChildren();
   if (withSelect) {
     options.selectOptions.forEach((option) => {
       const value =
@@ -3334,6 +3323,19 @@ async function showSelect(options) {
   }
 
   return result.selectedValue;
+}
+
+async function showConfirm(options) {
+  const result = await showModal({
+    title: options.title || 'Confirm',
+    message: options.message || '',
+    okText: options.okText || 'OK',
+    cancelText: options.cancelText || 'Cancel',
+    hideCancel: false,
+    withInput: false
+  });
+
+  return result.confirmed;
 }
 
 async function showAlert(messageText) {
